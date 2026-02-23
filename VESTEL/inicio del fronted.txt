@@ -1,0 +1,13 @@
+primero instalamos node.js y reiniciamos el computador
+luego instalamos npm en visual studio code
+npm install
+
+aveces para arrancar molesta mete esto 
+npm install babel-plugin-react-compiler --save-dev
+
+y arranca de nuevo  npm run dev
+
+instalar de pendencias npm install class-variance-authority
+
+EN BAK SE NECESITA EWSTO PARA PODER REALIZAR EL ENVIO ENTRE DOS DIFERENTES SERVICIOS }
+pip install django-cors-headers

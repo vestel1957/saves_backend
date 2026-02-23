@@ -1,0 +1,98 @@
+{% include 'encabezado.html' %}
+{% load static %}
+<div class="d-flex flex-row mb-3  flex-wrap gap-5 justify-content-center align-items-center min-vh-100 w-100 bg-light">
+  <!--   <div class="bloque_1_login">
+
+       Panel derecho (formulario login) -->
+    <div class="col-11 col-md-4 text-center border border-1 mx-auto card p-4 mb-5 bg-white rounded-4 mx-2" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); border: none;">
+      
+      <div class="card-title text-xs-center">
+        <div class="p-1">
+          <img src="media/imagenes/logo_login.png" |
+            alt="Icono" 
+            class="imagen_login"> 
+        </div>
+      </div>
+
+      
+      <!-- span ################# -->
+      <div class="d-flex align-items-center my-4">
+          <div class="flex-grow-1 border-bottom"></div>
+          <span class="px-3 text-muted fw-semibold" 
+                style="font-size: clamp(0.75rem, 2vw, 22px); letter-spacing: 0.5px;">
+              Panel de registro de cliente
+           </span>
+                    <!--clamp(0.75rem, 2vw, 0.9rem): Esta es la función mágica de CSS moderno.
+
+                    0.75rem: Es el tamaño mínimo (para celulares).
+
+                    2vw: Es el tamaño preferido (cambia según el ancho de la pantalla).
+
+                    0.9rem: Es el tamaño máximo (para computadoras). -->
+
+          <div class="flex-grow-1 border-bottom"></div>
+      </div>
+      <!-- span ################# -->
+
+      <div class="card-body mx-0">
+        <div class="card-block">
+          <form method="post" id="loginForm" class="form_login">
+            {% csrf_token %}
+
+            <input type="text" name="usuario" id="usuario" placeholder="Usuario" required class="input_login">
+
+            <div class="contra_login_card">
+                <input type="password" name="contra" id="contra" placeholder="Contraseña" class="input_login" required
+                    style="width: 100%; padding-right: 35px;"> <!-- padding para que no se monte el ojo -->
+                
+                <!-- 👁 Ojo dentro del input -->
+                <i class="fa-solid fa-eye" id="togglePassword" 
+                  style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666;">
+                </i>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold" id="btnLogin" style="background-color: #967ADC; border: 2px solid #967ADC;">
+                <i class="fa-solid fa-right-to-bracket me-2"></i>Login
+            </button>
+
+          </form>
+        </div>
+      </div>
+    </div>
+
+</div> 
+<script>
+  const form = document.getElementById("loginForm");
+  const btn = document.getElementById("btnLogin");
+
+  const togglePassword = document.getElementById("togglePassword");
+  const passwordInput = document.getElementById("contra");
+
+  togglePassword.addEventListener("click", function () {
+      const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+      passwordInput.setAttribute("type", type);
+      this.classList.toggle("fa-eye");
+      this.classList.toggle("fa-eye-slash");
+  });
+
+  form.addEventListener("submit", function(e) {
+    const usuario = document.getElementById("usuario").value.trim();
+    const contra = document.getElementById("contra").value.trim();
+
+    // Si falta usuario o contraseña, no bloqueamos el botón
+    if (!usuario || !contra) {
+      e.preventDefault(); // evita enviar el form vacío
+      alert("Por favor completa todos los campos");
+      return;
+    }
+
+    // Deshabilita el botón SOLO si hay datos
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> Cargando...`;
+  });
+</script>
+<script>
+    localStorage.removeItem("moduloAbierto");
+    localStorage.removeItem("submenuAbierto");
+    localStorage.removeItem("hijoActivo");
+</script>
+

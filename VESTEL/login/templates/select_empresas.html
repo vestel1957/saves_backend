@@ -1,0 +1,72 @@
+{% include 'encabezado.html' %}
+{% load static %}
+
+<div style="
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    min-height: 100vh; 
+    background: url('media/imagenes/IMAGEN_EMPRESA.jpg') no-repeat center center; 
+    background-size: cover;
+">
+
+    <div style="background-color: rgba(255, 255, 255, 0.823); padding: 50px; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.15); display: flex; flex-direction: column; align-items:center; text-align: center;">
+        <h1 style="text-align:center; margin-bottom: 20px;">SELECCIÓN DE SEDE</h1>
+
+        <form method="post" style="margin-bottom: 20px;">
+            {% csrf_token %}
+
+            <!-- STEP 1 -->
+            <!-- <div id="step1">
+                <div style="display: flex; flex-direction: row; gap: 10px; align-items: center; max-width: 400px; margin: 10px;">
+                    <label for="sede">SEDE:</label>
+
+                    <select name="sede" id="sede" required>
+                        
+                        {% for sede in lista_sedes %}
+                            <option value="{{ sede.codigo }}" {% if sede.codigo == sede_select %}selected{% endif %}>
+                                {{ emp.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button name="boton_busqueda" type="submit" style="padding: 6px 12px; background-color: #0c56c5; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+            </div> -->
+
+            <!-- STEP 2 -->
+                <div style=" display: flex; flex-direction: column; align-items:center; gap: 10px;">
+
+                    <div style=" display: flex; flex-direction: row; align-items:center; gap: 10px;">
+                        <label for="empresa">SEDE:</label>
+                        <select name="sede" id="sede" required>
+                            {% for sede in sedes %}
+                                <option value="{{ sede.0 }}">{{ sede.1 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div style=" display: flex; flex-direction: row; align-items:center; gap: 10px;">
+                        <label for="empresa">AÑO:</label>
+                        <select name="año" id="año" required>
+                            {% for year in lista_anios %}
+                                <option value="{{ year }}">{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button name="boton_ingresar" type="submit" style="margin-top: 15px; padding: 10px 20px; background: #0c56c5; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        Seleccionar
+                    </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    localStorage.removeItem("moduloAbierto");
+    localStorage.removeItem("submenuAbierto");
+    localStorage.removeItem("hijoActivo");
+</script>
