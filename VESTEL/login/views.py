@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from django.contrib.auth.hashers import check_password
 # from rest_framework_simplejwt.tokens import RefreshToken
 from login.choice import DOMINIO_CORREO
-from login.general import envio_email, firmar_cookie, generar_codigo, get_cookie_segura, token_required
+from login.general import comprobarCampos, WClenvio_email, firmar_cookie, WClgenerar_codigo, get_cookie_segura, token_required
 from nomina.models import *
 from django.contrib import messages
 from rest_framework_simplejwt.tokens import AccessToken
@@ -44,11 +44,20 @@ def WSglLogin(request):
     if not check_password(password, emp.UsPass):
         return Response({"ok": False, "mensaje": "Contraseña incorrecta"}, status=401)
 
+    if emp and emp.UsRoleid:
+        query_permisos = emp.UsRoleid.RoPermissions.all() 
+        
+        lista_permisos = list(query_permisos.values_list('PeKey', flat=True))
+    else:
+        lista_permisos = []
+
+    rol = emp.UsRoleid.RoName if emp.UsRoleid else "Sin Rol"
     access = AccessToken()
     access['empleado_id'] = emp.pk
     access['empleado_name'] = emp.UsUsername
-    # access['rol'] = emp.UsRole.RoName if emp.UsRole else ""
-    access.set_exp(lifetime=timedelta(hours=1))  # 1<-- usar timedelta
+    access['rol'] = rol
+    access['permisos'] = lista_permisos
+    access.set_exp(lifetime=timedelta(hours=2))  # 1<-- usar timedelta
 
     
     # if emp.UsRole:
@@ -69,18 +78,19 @@ def WSglLogin(request):
         "status": True,
         "access": str(access),
         "empleado": emp.UsUsername,
+        "rol": emp.UsRoleid.RoName if emp.UsRoleid else "",
         "empleado_id": emp.pk,
-        # "rol": emp.UsRole.RoName if emp.UsRole else ""
+        "lista_permisos": lista_permisos,
     })
     
-def funcion_lista_sedes():
+def WCoListaSedes():
     lista_sedes = []
     qsedes = Sede.objects.all()
     for s in qsedes:
         lista_sedes.append([s.pk, s.SeNombre])
     return lista_sedes
 
-def funcion_lista_modulos():
+def WCoListaModulos():
     lista_modulos = []
     qmodulo = Modules.objects.all()
     for s in qmodulo:
@@ -88,26 +98,26 @@ def funcion_lista_modulos():
     return lista_modulos
 
     
-@api_view(['POST'])
-@token_required
-def seleccion_sede(request):
-    # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    lista_sedes = []
-    print("request.rol", request.rol)
-    if request.rol:
-        lista_sedes = funcion_lista_sedes()
-        return Response({
-            "ok": True,
-            "empleado": request.empleado_name,
-            "rol": request.rol,
-            "menus": lista_sedes
-        })
+# @api_view(['POST'])
+# @token_required
+# def WCoSeleccionSede(request):
+#     # Ya puedes acceder a request.empleado_name, request.rol, etc.
+#     lista_sedes = []
+#     print("request.rol", request.rol)
+#     if request.rol:
+#         lista_sedes = WCoListaSedes()
+#         return Response({
+#             "ok": True,
+#             "empleado": request.empleado_name,
+#             "rol": request.rol,
+#             "menus": lista_sedes
+#         })
     
-    else:
-        return Response({
-            "ok": False,
-            "mensaje": "error de autentificacion",
-        })
+#     else:
+#         return Response({
+#             "ok": False,
+#             "mensaje": "error de autentificacion",
+#         })
         
 @api_view(['POST'])
 @token_required
@@ -142,7 +152,7 @@ def menu_principal(request):
     nombre_empresa = qempresa.EmRazonSocial
     logo_empresa = qempresa.EmLogo
     logo_empresa = os.path.join(settings.MEDIA_ROOT, "imagenes", "sin_foto.webp")
-    lista_modulos = funcion_lista_modulos()
+    lista_modulos = WCoListaModulos()
     if qempresa.EmLogo:
         logo_empresa = qempresa.EmLogo
     else:
@@ -204,16 +214,20 @@ def WSgListarUsuario(request):
     })
     
 @api_view(['POST'])
-@token_required
+# @token_required
 def WSgCrearUsuario(request):
     """
     T: W, mm: Sg, Accion: Crear, Entidad: Usuario
     Procesamiento manual de campos obligatorios sin ciclos.
     """
     data = request.data.get("formulario_usuario")
+    terminos_aceptados = []
     
     if not data:
         return Response({"ok": False, "mensaje": "Formulario vacío"}, status=400)
+
+    campos_obligatorios = ["nombre", "email", "password", "rol_id"]
+    comprobarCampos(data, campos_obligatorios)
 
     try:
         # Creamos el registro mapeando el JSON a los campos del Modelo Users
@@ -315,27 +329,15 @@ def WSgUsuariosBorrar(request, pk):
         
 @api_view(['POST'])
 @token_required
-def modales_lista(request):
-    # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    usuario = request.data.get("usuario")
-    
-    if usuario is None:
-        return Response({
-            "ok": False,
-            "mensaje": "error de usuario",
-        })
-
-    
+def WCoModalesLista(request):
     lista_modales =[]
-    
-    qmodales = Modules.objects.all().order_by('MdPadre__nombre','MdName')
-    print(qmodales)
+    qmodales = Modules.objects.all().order_by('MdPadre__MgNombre','MdName')
     
     try:
 
         if qmodales:
             for mod in qmodales:
-                lista_modales.append([mod.pk, mod.MdPadre.nombre, mod.MdName, mod.MdUrl])
+                lista_modales.append([mod.pk, mod.MdPadre.MgNombre, mod.MdName, mod.MdUrl])
             return Response({
                 "ok": True,
                 "mensaje": "lista de modales",
@@ -349,52 +351,60 @@ def modales_lista(request):
     except Exception as e:
         return Response({
             "ok": False,
-            "mensaje": f"Error borrando usuario: {str(e)}"
+            "mensaje": f"Error Listando Modulos: {str(e)}"
         }, status=400)
     
 @api_view(['POST'])
 @token_required
-def modales_crear(request):
+def WCoModalesCrear(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("FormularioModulos")
 
     if data is None:
         return Response({
             "ok": False,
             "mensaje": "Formulario vacío",
         }, status=400)
+    campos = ["nombre", "url", "llave", "modalPadre"]
+    comprobarCampos(data, campos)
+    mensaje, ok, status = "", False, 400
+    if ModuleGroup.objects.filter(pk=data["modalPadre"]).first():
+        # GUARDAR
+        try:
+            Modules.objects.create(
+                MdName=data["nombre"],
+                MdUrl=data["url"],
+                MdKey=data["llave"],
+                MdPadre_id=data["modalPadre"],
+            )
+            ok = True
+            mensaje = f"modulo creado con exito"
+            status = 200
 
-    # GUARDAR
-    try:
-        Modules.objects.create(
-            MdName=data["nombre"],
-            MdUrl=data["url"],
-            MdKey=data["MdKey"],
-            MdPadre_id=data["MdPadre"],
-        )
-        
-        return Response({
-            "ok": True,
-            "mensaje": f"modulo creado con exito"
-        })
-
-    except Exception as e:
-        return Response({
-            "ok": False,
-            "mensaje": f"Error guardando modulo: {str(e)}"
-        }, status=400)
+        except Exception as e:
+            return Response({
+                "ok": False,
+                "mensaje": f"Error guardando modulo: {str(e)}"
+            }, status=400)
+    else:
+        mensaje = "modulo padre no encontrado"
+    return Response({
+                "ok": ok,
+                "mensaje": mensaje
+            }, status=status)
         
 @api_view(['POST'])
 @token_required
-def modales_editar(request, pk):
+def WCoModalesEditar(request, pk):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("FormularioModulos")
+    print("data",data)
     qmodales = Modules.objects.filter(pk=pk).first()
 
     if qmodales is None:
         return Response({
             "ok": False,
-            "mensaje": "usuario no encontrado",
+            "mensaje": "modal no encontrado",
         }, status=400)
         
     if data is None:
@@ -403,29 +413,32 @@ def modales_editar(request, pk):
             "mensaje": "formulario vacío",
         }, status=400)
 
+    campos = ["nombre", "url", "llave", "modalPadre"]
+    comprobarCampos(data, campos)
+
     # GUARDAR
     try:
         qmodales.MdName=data["nombre"]
         qmodales.MdUrl=data["url"]
-        qmodales.MdKey=data["MdKey"]
-        qmodales.MdPadre_id=data["MdPadre"]
+        qmodales.MdKey=data["llave"]
+        qmodales.MdPadre_id=data["modalPadre"]
 
         qmodales.save()
         
         return Response({
             "ok": True,
-            "mensaje": f"usuario editado con exito"
+            "mensaje": f"modal editado con exito"
         })
 
     except Exception as e:
         return Response({
             "ok": False,
-            "mensaje": f"Error editando usuario: {str(e)}"
+            "mensaje": f"Error editando modal: {str(e)}"
         }, status=400)
         
 @api_view(['POST'])
 @token_required
-def modales_borrar(request, pk):
+def WCoModalesBorrar(request, pk):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     qmodales = Modules.objects.filter(pk=pk).first()
 
@@ -452,31 +465,151 @@ def modales_borrar(request, pk):
         }, status=400)
 # modales ##############################################################################
 
+# modales grupo ##############################################################################
+        
+@api_view(['POST'])
+@token_required
+def WCoModulosGrupoLista(request):
+    ListaModulosGrupo =[]
+    qmodalesGrupo = ModuleGroup.objects.all().order_by('MgOrden')
+    mensaje, ok, status = "",False, 400
+    try:
+
+        if qmodalesGrupo:
+            for mod in qmodalesGrupo:
+                ListaModulosGrupo.append([mod.pk, mod.MgNombre, mod.MgIcono, mod.MgOrden])
+                ok = True
+                mensaje= "lista de modulos"
+                status = 200
+
+        else:
+            mensaje=  "error al encontrar los modulos"
+
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje,
+            "ListaModulosGrupo":ListaModulosGrupo
+        }, status=status)
+    except Exception as e:
+        return Response({
+            "ok": ok,
+            "mensaje": f"Error Listando Modulos: {str(e)}"
+        }, status=status)
+    
+@api_view(['POST'])
+@token_required
+def WCoModulosGrupoCrear(request):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    data = request.data.get("EModulosGrupo")
+
+    if data is None:
+        return Response({
+            "ok": False,
+            "mensaje": "Formulario vacío",
+        }, status=400)
+    
+    campos = ["nombre", "icono", "orden"]
+    comprobarCampos(data, campos)
+        # GUARDAR
+    try:
+        ModuleGroup.objects.create(
+            MgNombre=data["nombre"],
+            MgIcono=data["icono"],
+            MgOrden=data["orden"],
+        )
+        return Response({
+            "ok": True,
+            "mensaje": "modulo guardado"
+        }, status=200)
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error guardando modulo: {str(e)}"
+        }, status=400)
+
+@api_view(['POST'])
+@token_required
+def WCoModulosGrupoEditar(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    data = request.data.get("EModulosGrupo")
+    print("data",data)
+    mensaje, ok, status = "", False, 400
+    qmodales = ModuleGroup.objects.filter(pk=pk).first()
+
+    if data is None:
+        return Response({
+            "ok": False,
+            "mensaje": "formulario vacío",
+        }, status=400)
+
+    campos = ["nombre", "icono", "orden"]
+    comprobarCampos(data, campos)
+
+    # GUARDAR
+    try:
+        if qmodales:
+            qmodales.MgNombre=data["nombre"]
+            qmodales.MgIcono=data["icono"]
+            qmodales.MgOrden=data["orden"]
+            qmodales.save()
+            mensaje, ok, status = "Modal editado", True, 200
+        else:
+            mensaje ="modal no encontrado"
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje,
+        }, status=status)
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error editando modal: {str(e)}"
+        }, status=400)
+        
+@api_view(['POST'])
+@token_required
+def WCoModulosGrupoBorrar(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    qmodales = ModuleGroup.objects.filter(pk=pk).first()
+
+    if qmodales is None:
+        return Response({
+            "ok": False,
+            "mensaje": "modal no encontrado",
+        }, status=400)
+        
+
+    # GUARDAR
+    try:
+        qmodales.delete()
+        
+        return Response({
+            "ok": True,
+            "mensaje": f"modal borrado con exito"
+        })
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando modal: {str(e)}"
+        }, status=400)
+# modales grupo##############################################################################
+
 # sedes ##############################################################################
         
 @api_view(['POST'])
 @token_required
-def sedes_lista(request):
-    # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    usuario = request.data.get("usuario")
-    
-    if usuario is None:
-        return Response({
-            "ok": False,
-            "mensaje": "error de usuario",
-        })
-
-    
+def WCoSedesLista(request):
     lista_sedes =[]
-    
     qsedes = Sede.objects.all().order_by('SeNombre')
-    print(qsedes)
     
     try:
 
         if qsedes:
             for sed in qsedes:
-                lista_sedes.append([sed.pk, sed.SeLetra, sed.SeNombre, sed.SeMunicipio.MuMunicipio, sed.SeEstado])
+                lista_sedes.append([sed.pk, sed.SeLetra, sed.SeNombre, sed.SeMunicipio.CiNombre, sed.SeEstado])
             return Response({
                 "ok": True,
                 "mensaje": "lista de sedes",
@@ -495,9 +628,9 @@ def sedes_lista(request):
     
 @api_view(['POST'])
 @token_required
-def sedes_crear(request):
+def WCoSedesCrear(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("FormularioSedes")
     qempresa = Empresas.objects.all().first()
     # Municipios = empresas.objects.filter(pk=).first()
 
@@ -533,7 +666,7 @@ def sedes_crear(request):
         
 @api_view(['POST'])
 @token_required
-def sedes_editar(request, pk):
+def WCoSedesEditar(request, pk):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     data = request.data.get("formulario")
     qsedes = Sede.objects.filter(pk=pk).first()
@@ -574,14 +707,14 @@ def sedes_editar(request, pk):
         
 @api_view(['POST'])
 @token_required
-def sedes_borrar(request, pk):
+def WCoSedesBorrar(request, pk):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     qsedes = Sede.objects.filter(pk=pk).first()
 
     if qsedes is None:
         return Response({
             "ok": False,
-            "mensaje": "modal no encontrado",
+            "mensaje": "sede no encontrada",
         }, status=400)
         
 
@@ -591,13 +724,138 @@ def sedes_borrar(request, pk):
         
         return Response({
             "ok": True,
-            "mensaje": f"modal borrado con exito"
+            "mensaje": f"sede borrado con exito"
         })
 
     except Exception as e:
         return Response({
             "ok": False,
-            "mensaje": f"Error borrando modal: {str(e)}"
+            "mensaje": f"Error borrando la sede: {str(e)}"
+        }, status=400)
+# sedes ##############################################################################login
+
+
+# accion ##############################################################################
+        
+@api_view(['POST'])
+@token_required
+def WCoAccionLista(request):
+    ListaAcciones =[]
+    qAcciones = Actions.objects.all().order_by('AcName')
+    
+    try:
+
+        if qAcciones:
+            for acciones in qAcciones:
+                ListaAcciones.append([acciones.pk, acciones.AcName, acciones.AcKey])
+            return Response({
+                "ok": True,
+                "mensaje": "lista de Acciones",
+                "ListaAcciones": ListaAcciones,
+            })  
+        else:
+            return Response({
+                "ok": False,
+                "mensaje": "error al encontrar la accion",
+            })
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando la accion: {str(e)}"
+        }, status=400)
+    
+@api_view(['POST'])
+# @token_required
+def WCoAccionCrear(request):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    data = request.data.get("EAccion")
+
+    if data is None:
+        return Response({
+            "ok": False,
+            "mensaje": "Formulario vacío",
+        }, status=400)
+
+    # GUARDAR
+    try:
+        Actions.objects.create(
+            AcKey=data["llave"],
+            AcName=data["nombre"],
+        )
+        
+        return Response({
+            "ok": True,
+            "mensaje": f"accion creado con exito"
+        })
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error guardando accion: {str(e)}"
+        }, status=400)
+        
+@api_view(['POST'])
+@token_required
+def WCoAccionEditar(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    data = request.data.get("EAccion")
+    qAccion = Actions.objects.filter(pk=pk).first()
+
+    if qAccion is None:
+        return Response({
+            "ok": False,
+            "mensaje": "usuario no encontrado",
+        }, status=400)
+        
+    if data is None:
+        return Response({
+            "ok": False,
+            "mensaje": "formulario vacío",
+        }, status=400)
+
+    # GUARDAR
+    try:
+        qAccion.AcKey=data["llave"]
+        qAccion.AcName=data["nombre"]
+        qAccion.save()
+        
+        return Response({
+            "ok": True,
+            "mensaje": f"Accion editado con exito"
+        })
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error editando Accion: {str(e)}"
+        }, status=400)
+        
+@api_view(['POST'])
+@token_required
+def WCoAccionBorrar(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    qAccion = Actions.objects.filter(pk=pk).first()
+    ok,status, mensaje = False, 400, ""
+    # GUARDAR
+    try:
+        if qAccion:
+            qAccion.delete()
+            mensaje = "Accion borrada con exito"
+            status = 200
+            ok = True
+        else:
+            mensaje = "Accion no encontrada"
+            
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje
+        }, status=status)
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando la Accion: {str(e)}"
         }, status=400)
 # sedes ##############################################################################login
 
@@ -607,11 +865,11 @@ def sedes_borrar(request, pk):
 #comprobar correo
 @api_view(['POST'])
 # @token_required
-def comprobar_correo(request):
+def WClcomprobar_correo(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     correo = request.data.get("email")
     
-    qcorreo = Employees.objects.filter(email=correo).first()
+    qcorreo = Users.objects.filter(UsEmail=correo).first()
     correo_estado = False
     mensaje_correo = "correo no encontrado"
     correo = ""
@@ -626,20 +884,20 @@ def comprobar_correo(request):
             mensaje_correo = "correo encontrado"
             status = 200
             
-            codigo = generar_codigo()
+            codigo = WClgenerar_codigo()
             mensaje = {
-                "usuario": qcorreo.EmName,
+                "usuario": qcorreo.UsUsername,
                 "codigo": codigo,
                 "empresa": "Saves",
             }
-            generar_codigo()
-            correo = qcorreo.EmEmail
+            WClgenerar_codigo()
+            correo = qcorreo.UsEmail
             dominio_actual = correo.split('@')[-1]  # "gmail.com"
             # Buscar si el dominio coincide con alguno de la lista
             dominio = next((nombre for dom, nombre in DOMINIO_CORREO if dom == dominio_actual), 'otro')
-            envio_email(correo, "Código de verificación - Cambio de contraseña", mensaje, dominio, "")
+            WClenvio_email(correo, "Código de verificación - Cambio de contraseña", mensaje, dominio, "")
             
-            qcorreo.EmCodigoVerificacion = codigo
+            qcorreo.UsVerificationCode = codigo
             qcorreo.save()
             print("correo",correo)
             print("codigo",codigo)
@@ -659,12 +917,12 @@ def comprobar_correo(request):
             "mensaje": f"Error: {str(e)}"
         }, status=400)
 @api_view(['POST'])       
-def verificar_codigo(request):
+def WSgVerificarCodigo(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     correo = request.data.get("email")
     codigo = request.data.get("codigo")
     
-    qusuario = Employees.objects.filter(email=correo, EmCodigoVerificacion=codigo).first()
+    qusuario = Users.objects.filter(UsEmail=correo, UsVerificationCode=codigo).first()
     estado = False
     status = 400
     print("correo",correo)
@@ -688,13 +946,13 @@ def verificar_codigo(request):
         }, status=400)
         
 @api_view(['POST'])       
-def cambio_contra(request):
+def WSgCambioContra(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
     correo = request.data.get("email")
     codigo = request.data.get("codigo")
     contraseña = request.data.get("password")
     
-    qusuario = Employees.objects.filter(email=correo, EmCodigoVerificacion=codigo).first()
+    qusuario = Users.objects.filter(UsEmail=correo, UsVerificationCode=codigo).first()
     estado = False
     status = 400
     print("correo",correo)
@@ -704,7 +962,7 @@ def cambio_contra(request):
         if qusuario:
             estado = True
             status = 200
-            qusuario.password_hash = make_password(contraseña)
+            qusuario.UsPass = make_password(contraseña)
             qusuario.save()
         
         return Response({
@@ -724,9 +982,9 @@ def cambio_contra(request):
         
 @token_required      
 @api_view(['POST'])       
-def modulos_accion(request):
+def WSgModulosAccionCrear(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("EModuloAccion")
     mensaje = ""
     estado = False
     status = 400
@@ -740,7 +998,10 @@ def modulos_accion(request):
                 permisos = item.get("permisos", {})
                 
                 for accion, permitido in permisos.items():
-                    qaccion = Actions.objects.filter(AcKey=accion).first()
+                    qaccion = Actions.objects.filter(AcKey=str(accion)).first()
+                    if not qaccion:
+                        print(f"Error: La acción {accion} no existe en la base de datos")
+                        continue
                     print("accion",accion,permitido)
                     qs = ModuleActions.objects.filter(
                         MaModule=qmodulo,
@@ -771,10 +1032,67 @@ def modulos_accion(request):
             "ok": False,
             "mensaje": f"Error: {str(e)}"
         }, status=400)
+    
+@token_required      
+@api_view(['POST']) 
+def WSgModulosAccionLista(request):
+    ListaModuloAccion =[]
+    qModuleActions = ModuleActions.objects.all().order_by('MaModule__MdName')
+    
+    try:
+
+        if qModuleActions:
+            for mod in qModuleActions:
+                ListaModuloAccion.append([mod.pk, mod.MaModule.MdName, mod.MaAction.AcName])
+            return Response({
+                "ok": True,
+                "mensaje": "lista de sedes",
+                "ListaModuloAccion": ListaModuloAccion,
+            })  
+        else:
+            return Response({
+                "ok": False,
+                "mensaje": "error al encontrar los sede",
+            })
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando la sede: {str(e)}"
+        }, status=400)
+
+###############################################     
+@api_view(['POST'])
+@token_required
+def WSgModulosAccionBorrar(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    qModuleActions = ModuleActions.objects.filter(pk=pk).first()
+
+    if qModuleActions is None:
+        return Response({
+            "ok": False,
+            "mensaje": "Modulo Accion no encontrada",
+        }, status=400)
         
+
+    # GUARDAR
+    try:
+        qModuleActions.delete()
+        
+        return Response({
+            "ok": True,
+            "mensaje": f"Modulo Accion borrado con exito"
+        })
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando el Modulo Accion: {str(e)}"
+        }, status=400)
+# sedes ##############################################################################login
+
 @api_view(['POST'])
 # @token_required
-def permisos(request):
+def WSgPermisos(request):
 
     llave = request.data.get("llave")
     nombre = request.data.get("nombre")
@@ -810,39 +1128,32 @@ def permisos(request):
         
 # roles ##############################################################################
         
-@api_view(['GET'])
+@api_view(['POST'])
 @token_required
-def roles_lista(request):
+def WSgListarRol(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    usuario = request.data.get("usuario")
-    
-    if usuario is None:
-        return Response({
-            "ok": False,
-            "mensaje": "error de usuario",
-        })
-
-    
     lista_roles =[]
     
     qroles = Roles.objects.all().order_by('RoName')
     print(qroles)
-    
+    ok, mensaje, status = False, "", 400
     try:
 
         if qroles:
+            mensaje = "lista de roles"
+            ok = True
+            status = 200
             for rol in qroles:
-                lista_roles.append([rol.pk, rol.RoKey, rol.RoName, rol.RoDateCreated, rol.RoSystem, rol.RoPermissions.Permissions_id])
-            return Response({
-                "ok": True,
-                "mensaje": "lista de roles",
-                "lista_roles": lista_roles,
-            }, status=200)  
+                lista_roles.append([rol.pk, rol.RoKey, rol.RoName, rol.RoDateCreated, rol.RoSystem]) 
         else:
-            return Response({
-                "ok": False,
-                "mensaje": "error al encontrar los roles",
-            }, status=400)
+            mensaje = "No hay roles registrados"
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje,
+            "lista_roles": lista_roles
+        }, status=status)
+    
     except Exception as e:
         return Response({
             "ok": False,
@@ -851,22 +1162,25 @@ def roles_lista(request):
     
 @api_view(['POST'])
 @token_required
-def roles_crear(request):
+def WSgCrearRol(request):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("ERol")
 
     if data is None:
         return Response({
             "ok": False,
             "mensaje": "Formulario vacío",
         }, status=400)
+    
+    campos_obligatorios = ["llave", "nombre", "estado"]
+    comprobarCampos(data, campos_obligatorios)
 
     # GUARDAR
     try:
         rol = Roles.objects.create(
             RoKey=data["llave"],
             RoName=data["nombre"],
-            RoSystem=data["sistema"],
+            RoSystem=data["estado"],
         )
         
         if "permisos" in data and data["permisos"]:
@@ -885,9 +1199,9 @@ def roles_crear(request):
         
 @api_view(['POST'])
 @token_required
-def roles_editar(request, pk):
+def WSgActualizarRol(request, pk):
     # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    data = request.data.get("formulario")
+    data = request.data.get("ERol")
     qroles = Roles.objects.filter(pk=pk).first()
 
     if qroles is None:
@@ -901,12 +1215,16 @@ def roles_editar(request, pk):
             "ok": False,
             "mensaje": "formulario vacío",
         }, status=400)
+    
+    campos_obligatorios = ["llave", "nombre", "estado"]
+    comprobarCampos(data, campos_obligatorios)
+
 
     # GUARDAR
     try:
         qroles.RoKey=data["llave"]
         qroles.RoName=data["nombre"]
-        qroles.RoSystem=data["sistema"]
+        qroles.RoSystem=data["estado"]
         qroles.save()
         
         return Response({
@@ -922,35 +1240,34 @@ def roles_editar(request, pk):
         
 @api_view(['POST'])
 @token_required
-def roles_borrar(request, pk):
-    # Ya puedes acceder a request.empleado_name, request.rol, etc.
-    qroles = Roles.objects.filter(pk=pk).first()
-
-    if qroles is None:
-        return Response({
-            "ok": False,
-            "mensaje": "rol no encontrado",
-        }, status=400)
-        
-
+def WSgBorrarRol(request, pk):
+    qRol = Roles.objects.filter(pk=pk).first()
+    ok,status, mensaje = False, 400, ""
     # GUARDAR
     try:
-        qroles.delete()
+        if qRol:
+            qRol.delete()
+            mensaje = "Rol borrada con exito"
+            status = 200
+            ok = True
+        else:
+            mensaje = "Rol no encontrada"
+            
         
         return Response({
-            "ok": True,
-            "mensaje": f"rol borrado con exito"
-        }, status=200)
+            "ok": ok,
+            "mensaje": mensaje
+        }, status=status)
 
     except Exception as e:
         return Response({
             "ok": False,
-            "mensaje": f"Error borrando rol: {str(e)}"
+            "mensaje": f"Error borrando el Rol: {str(e)}"
         }, status=400)
 # roles ##############################################################################
 
 @api_view(["GET"])
-def roles_ver_permisos(request, rol_id):
+def WSgRolesVerPermisos(request, rol_id):
     try:
         rol = Roles.objects.get(pk=rol_id)
 
@@ -975,39 +1292,158 @@ def roles_ver_permisos(request, rol_id):
             "ok": False,
             "mensaje": "Rol no encontrado"
         }, status=404)
+    
+# permisos ##############################################################################
+        
+@api_view(['POST'])
+@token_required
+def WSgListarPermisos(request):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    ListaPermisos =[]
+    
+    qpermisos = Permissions.objects.all().order_by('PeName')
+    ok, mensaje, status = False, "", 400
+    try:
 
+        if qpermisos:
+            mensaje = "lista de permisos"
+            ok = True
+            status = 200
+            for permi in qpermisos:
+                ListaPermisos.append([permi.pk, permi.PeModuleActionId.MaModule.MdName,permi.PeModuleActionId.MaAction.AcName, permi.PeName, permi.PeKey]) 
+        else:
+            mensaje = "No hay permisos registrados"
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje,
+            "ListaPermisos": ListaPermisos
+        }, status=status)
+    
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error listando roles: {str(e)}"
+        }, status=400)
+    
 from django.db import transaction       
 @api_view(["POST"])
 @transaction.atomic
-def roles_asignar_permisos(request, rol_id):
-    permisos_ids = request.data.get("permisos")
+def WSgPermisosCrear(request):
+    data = request.data.get("EPermisos")
+    qpermiso = Permissions.objects.all().first()
 
-    if not permisos_ids:
+    if data is None:
         return Response({
             "ok": False,
-            "mensaje": "Debe enviar una lista de permisos"
+            "mensaje": "formulario vacío",
         }, status=400)
+    
+    campos_obligatorios = ["ModuloAccion", "llave", "nombre"]
+    comprobarCampos(data, campos_obligatorios)
+    ok, status, mensaje = False,400,""
 
+    # GUARDAR
     try:
-        rol = Roles.objects.get(pk=rol_id)
+        qmoduloAccion = ModuleActions.objects.filter(pk=data["ModuloAccion"]).first()
+        if qmoduloAccion:
+            if qpermiso:
+                qpermiso.PeModuleActionId=qmoduloAccion
+                qpermiso.PeKey=data["llave"]
+                qpermiso.PeName=data["nombre"]
+                qpermiso.save()
+                ok, status, mensaje = True,200,"Permiso Guardado"
+            else:
+                mensaje = "permiso no registrado"
 
-        permisos_validos = Permissions.objects.filter(id__in=permisos_ids)
-
-        if not permisos_validos.exists():
-            return Response({
-                "ok": False,
-                "mensaje": "Permisos inválidos"
-            }, status=400)
-
-        rol.RoPermissions.set(permisos_validos)
-
+        else:
+            mensaje = "Modulo accion no registrado"
+        
         return Response({
-            "ok": True,
-            "mensaje": "Permisos asignados correctamente"
-        })
+            "ok": ok,
+            "mensaje": mensaje
+        }, status=status)
 
-    except Roles.DoesNotExist:
+    except Exception as e:
         return Response({
             "ok": False,
-            "mensaje": "Rol no encontrado"
-        }, status=404)
+            "mensaje": f"Error guardando permiso: {str(e)}"
+        }, status=400)
+        
+@api_view(['POST'])
+@token_required
+def WSgActualizarPermisos(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    data = request.data.get("EPermisos")
+    qpermiso = Permissions.objects.filter(pk=pk).first()
+    qmodulo = ModuleActions.objects.filter(pk=data["ModuloAccion"]).first()
+
+    if data is None:
+        return Response({
+            "ok": False,
+            "mensaje": "formulario vacío",
+        }, status=400)
+    
+    campos_obligatorios = ["ModuloAccion", "llave", "nombre"]
+    comprobarCampos(data, campos_obligatorios)
+    ok, status, mensaje = False,400,""
+
+    # GUARDAR
+    try:
+        if qmodulo:
+            if qpermiso:
+                qpermiso.PeModuleActionId=qmodulo
+                qpermiso.PeKey=data["llave"]
+                qpermiso.PeName=data["nombre"]
+                qpermiso.save()
+                ok, status, mensaje = True,200,"Permiso editado"
+            else:
+                mensaje = "permiso no registrado"
+        else:
+            mensaje = "modulo no registrado"
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje
+        }, status=status)
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error editando permiso: {str(e)}"
+        }, status=400)
+        
+@api_view(['POST'])
+@token_required
+def WSgBorrarPermisos(request, pk):
+    # Ya puedes acceder a request.empleado_name, request.rol, etc.
+    qpermisos = Permissions.objects.filter(pk=pk).first()
+
+    if qpermisos is None:
+        return Response({
+            "ok": False,
+            "mensaje": "rol no encontrado",
+        }, status=400)
+        
+
+    ok, status, mensaje = False,400,""
+
+    # GUARDAR
+    try:
+        if qpermisos:
+            qpermisos.delete()
+            ok, status, mensaje = True,200,"Permiso Borrado con exito"
+
+        else:
+            mensaje = "permiso no registrado"
+        
+        return Response({
+            "ok": ok,
+            "mensaje": mensaje
+        }, status=status)
+
+    except Exception as e:
+        return Response({
+            "ok": False,
+            "mensaje": f"Error borrando Permiso: {str(e)}"
+        }, status=400)

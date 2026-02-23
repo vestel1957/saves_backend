@@ -14,8 +14,7 @@ class Actions(models.Model):
         return f"{self.AcName}"
 
     class Meta:
-        db_table = "Acciones" \
-        ""
+        db_table = "Acciones"
         
 class ModuleGroup(models.Model):
     """
@@ -23,7 +22,7 @@ class ModuleGroup(models.Model):
     """
     MgNombre = models.CharField("NOMBRE DEL GRUPO", max_length=100)
     MgIcono = models.CharField("ICONO (FontAwesome)", max_length=50, default="fa-folder", null=True, blank=True)
-    MgOrden = models.IntegerField("ORDEN EN EL MENU", default=1)
+    MgOrden = models.IntegerField("ORDEN EN EL MENU", unique=True)
 
     def __str__(self) -> str:
         return self.MgNombre
@@ -224,7 +223,7 @@ class Users(models.Model):
     UsHinicial = models.TimeField("HORA INICIAL", null=True, blank=True)
     UsFcierre = models.DateField("FECHA CIERRE", null=True, blank=True)
     UsHcierre = models.TimeField("HORA CIERRE", null=True, blank=True)
-    UsRoleid = models.IntegerField("ROLE ID")
+    UsRoleid = models.ForeignKey(Roles, on_delete=models.SET_NULL, null=True)
     UsPicture = models.CharField("PICTURE", max_length=50, null=True, blank=True)
     UsSedeAccede = models.CharField("SEDE ACCEDE", max_length=25, null=True, blank=True)
 

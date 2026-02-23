@@ -7,7 +7,7 @@ from login import views
 urlpatterns = [
     path('', views.inicio, name='inicio'),  # Ruta raíz redirige por nombre
     path('WSglLogin', WSglLogin, name='WSglLogin'),  # Ruta con nombre
-    path('seleccion_sede', seleccion_sede, name='seleccion_sede'),  
+    # path('seleccion_sede', seleccion_sede, name='seleccion_sede'),  
     path('menu_principal', menu_principal, name='menu_principal'),  
     
     # usuarios #######################################
@@ -18,36 +18,62 @@ urlpatterns = [
     # usuarios #######################################
     
     # modales #######################################
-    path('modales_lista', modales_lista, name='modales_lista'),  
-    path('modales_crear', modales_crear, name='modales_crear'),  
-    path('modales_editar/<int:pk>', modales_editar, name='modales_editar'),  
-    path('modales_borrar/<int:pk>', modales_borrar, name='modales_borrar'),  
+    path('WCoModalesLista', WCoModalesLista, name='WCoModalesLista'),  
+    path('WCoModalesCrear', WCoModalesCrear, name='WCoModalesCrear'),  
+    path('WCoModalesEditar/<int:pk>', WCoModalesEditar, name='WCoModalesEditar'),  
+    path('WCoModalesBorrar/<int:pk>', WCoModalesBorrar, name='WCoModalesBorrar'),  
     # modales #######################################
+
+    # modales grupo #######################################
+    path('WCoModulosGrupoLista', WCoModulosGrupoLista, name='WCoModulosGrupoLista'),  
+    path('WCoModulosGrupoCrear', WCoModulosGrupoCrear, name='WCoModulosGrupoCrear'),  
+    path('WCoModulosGrupoEditar/<int:pk>', WCoModulosGrupoEditar, name='WCoModulosGrupoEditar'),  
+    path('WCoModulosGrupoBorrar/<int:pk>', WCoModulosGrupoBorrar, name='WCoModulosGrupoBorrar'),  
+    # modales grupo #######################################
     
     # sedes #######################################
-    path('sedes_lista', sedes_lista, name='sedes_lista'),  
-    path('sedes_crear', sedes_crear, name='sedes_crear'),  
-    path('sedes_editar/<int:pk>', sedes_editar, name='sedes_editar'),  
-    path('sedes_borrar/<int:pk>', sedes_borrar, name='sedes_borrar'),  
+    path('WCoSedesLista', WCoSedesLista, name='WCoSedesLista'),  
+    path('WCoSedesCrear', WCoSedesCrear, name='WCoSedesCrear'),  
+    path('WCoSedesEditar/<int:pk>', WCoSedesEditar, name='WCoSedesEditar'),  
+    path('WCoSedesBorrar/<int:pk>', WCoSedesBorrar, name='WCoSedesBorrar'),  
     # sedes #######################################
+
+     # ACCION #######################################
+    path('WCoAccionLista', WCoAccionLista, name='WCoAccionLista'),  
+    path('WCoAccionCrear', WCoAccionCrear, name='WCoAccionCrear'),  
+    path('WCoAccionEditar/<int:pk>', WCoAccionEditar, name='WCoAccionEditar'),  
+    path('WCoAccionBorrar/<int:pk>', WCoAccionBorrar, name='WCoAccionBorrar'),  
+    # accion #######################################
     
     
-    #comprobar_correo
-    path('comprobar_correo', comprobar_correo, name='comprobar_correo'),  
-    path('cambio_contra', cambio_contra, name='cambio_contra'),  
-    path('verificar_codigo', verificar_codigo, name='verificar_codigo'),  
-    path('modulos_accion', modulos_accion, name='modulos_accion'),  
-    path('permisos', permisos, name='permisos'),  
+    #WClcomprobar_correo
+    path('WClcomprobar_correo', WClcomprobar_correo, name='WClcomprobar_correo'),  
+    path('WSgCambioContra', WSgCambioContra, name='WSgCambioContra'),  
+    path('WSgVerificarCodigo', WSgVerificarCodigo, name='WSgVerificarCodigo'),  
+
+
+    path('WSgModulosAccionCrear', WSgModulosAccionCrear, name='WSgModulosAccionCrear'),  
+    path('WSgModulosAccionLista', WSgModulosAccionLista, name='WSgModulosAccionLista'),  
+    path('WSgModulosAccionBorrar/<int:pk>', WSgModulosAccionBorrar, name='WSgModulosAccionBorrar'),  
+
+    path('WSgPermisos', WSgPermisos, name='WSgPermisos'),  
     
     # roles #######################################
-    path('roles_lista', roles_lista, name='roles_lista'),  
-    path('roles_crear', roles_crear, name='roles_crear'),  
-    path('roles_editar/<int:pk>', roles_editar, name='roles_editar'),  
-    path('roles_borrar/<int:pk>', roles_borrar, name='roles_borrar'),  
+    path('WSgListarRol', views.WSgListarRol, name='WSgListarRol'),
+    path('WSgCrearRol', views.WSgCrearRol, name='WSgCrearRol'),
+    path('WSgActualizarRol/<int:pk>', views.WSgActualizarRol, name='WSgActualizarRol'),
+    path('WSgBorrarRol/<int:pk>', views.WSgBorrarRol, name='WSgBorrarRol'),
     # roles #######################################
     
-    path("roles/<int:rol_id>/permisos", roles_ver_permisos),
-    path("roles/<int:rol_id>/permisos/asignar", roles_asignar_permisos),    
+    path("WSgRolesVerPermisos/<int:rol_id>/permisos", WSgRolesVerPermisos),
+
+    # permisos #######################################
+    path('WSgListarPermisos', WSgListarPermisos, name='WSgListarPermisos'),  
+    path('WSgPermisosCrear', WSgPermisosCrear, name='WSgPermisosCrear'),  
+    path('WSgActualizarPermisos/<int:pk>', WSgActualizarPermisos, name='WSgActualizarPermisos'),  
+    path('WSgBorrarPermisos/<int:pk>', WSgBorrarPermisos, name='WSgBorrarPermisos'),  
+    # permisos #######################################
+    # path("WSgRolesAsignarPermisos/<int:rol_id>/permisos/asignar", WSgRolesAsignarPermisos),    
     
     # path('', views.inicio, name='inicio'),  # Ruta raíz redirige por nombre
     # path('login', login.as_view(), name='login'),  
